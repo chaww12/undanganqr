@@ -1,4 +1,4 @@
-<x-adminlayout>
+<x-superadminlayout>
     <x-slot:title>Preview Undangan</x-slot:title>
 
     <div class="flex justify-between mb-4">
@@ -7,7 +7,7 @@
             <a href="#" onclick="checkTamu({{ $event->id }})" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-yellow-600 rounded-md hover:bg-yellow-500 mr-2">
                 Buat Undangan (QR Code)
             </a>
-            <a href="{{ route('admin.tamu.show', $event->id) }}" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-500">
+            <a href="{{ route('superadmin.tamu.show', $event->id) }}" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-500">
                 Kembali
             </a>
         </div>
@@ -16,9 +16,9 @@
     @if ($event->poster)
         <div class="relative mb-4">
             <img src="{{ asset('storage/' . $event->poster) }}" alt="Poster" class="w-auto h-auto max-w-full max-h-full">
-            <div class="absolute" style="right: 112px; top: 310px; /* Sesuaikan nilai ini untuk memindahkan kotak */">
-                <div style="width: 260px; height: 300px;" class="bg-white border border-gray-300 rounded-md flex items-center justify-center">
-                    <p class="text-gray-400">.</p>
+            <div class="absolute" style="right: 112px; top: 310px; width: 260px; height: 300px;">
+                <div class="bg-white border border-gray-300 rounded-md flex items-center justify-center" style="width: 100%; height: 100%;">
+                    <p class="text-gray-400">QR</p>
                 </div>
             </div>
         </div>
@@ -44,4 +44,4 @@
         }
     </script>
     
-</x-adminlayout>
+</x-superadminlayout>

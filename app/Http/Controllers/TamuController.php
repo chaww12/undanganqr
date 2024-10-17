@@ -25,12 +25,34 @@ class TamuController extends Controller
         ]);
     }
 
+    public function supindex()
+    {
+        $events = Event::all();
+
+        return view('superadmin.tamu.index', [
+            'title' => 'Daftar Tamu',
+            'events' => $events
+        ]);
+    }
+
     public function show($eventId)
     {
         $event = Event::findOrFail($eventId);
         $tamus = Tamu::where('idevent', $eventId)->get();
     
         return view('admin.tamu.show', [
+            'title' => 'Daftar Tamu untuk ' . $event->namaevent,
+            'event' => $event,
+            'tamus' => $tamus,
+        ]);
+    }
+
+    public function supshow($eventId)
+    {
+        $event = Event::findOrFail($eventId);
+        $tamus = Tamu::where('idevent', $eventId)->get();
+    
+        return view('superadmin.tamu.show', [
             'title' => 'Daftar Tamu untuk ' . $event->namaevent,
             'event' => $event,
             'tamus' => $tamus,
@@ -44,6 +66,14 @@ class TamuController extends Controller
     
         return view('admin.tamu.preview', compact('event', 'tamuCount')); 
     }    
+
+    public function suppreview($id)
+    {
+        $event = Event::findOrFail($id);
+        $tamuCount = Tamu::where('idevent', $id)->count(); 
+    
+        return view('superadmin.tamu.preview', compact('event', 'tamuCount')); 
+    } 
 
     public function generateQrCodes($eventId)
     {
@@ -90,6 +120,51 @@ class TamuController extends Controller
         return response()->download($zipFilePath)->deleteFileAfterSend(true);
     }    
 
+    public function supgenerateQrCodes($eventId)
+    {
+        $tamus = Tamu::where('idevent', $eventId)->get();
+
+        $directory = storage_path('app/qrcodes');
+
+        if (!is_dir($directory)) {
+            mkdir($directory, 0755, true);
+        }
+    
+        $filePaths = []; 
+        
+        foreach ($tamus as $tamu) {
+            $qrCode = Builder::create()
+                ->writer(new PngWriter())
+                ->data($tamu->id) 
+                ->encoding(new Encoding('UTF-8'))
+                ->errorCorrectionLevel(ErrorCorrectionLevel::High)
+                ->size(200)
+                ->margin(10)
+                ->build();
+
+            $fileName = 'qrcodes/' . $tamu->nama . '.png'; 
+            Storage::put($fileName, $qrCode->getString());
+
+            $filePaths[] = storage_path('app/private/' . $fileName); 
+        }
+
+        $zipFileName = 'qrcodes.zip';
+        $zipFilePath = storage_path('app/private/' . $zipFileName);
+
+        $zip = new \ZipArchive();
+        if ($zip->open($zipFilePath, \ZipArchive::CREATE) !== TRUE) {
+            return response()->json(['message' => 'Gagal membuat zip file.'], 500);
+        }
+
+        foreach ($filePaths as $filePath) {
+            $zip->addFile($filePath, basename($filePath)); 
+        }
+
+        $zip->close();
+
+        return response()->download($zipFilePath)->deleteFileAfterSend(true);
+    }   
+
     public function scan()
     {
         return view('registrasi.index');
@@ -130,6 +205,11 @@ class TamuController extends Controller
         return view('admin.tamu.import', compact('eventId'));
     }
 
+    public function supshowImportForm($eventId)
+    {
+        return view('superadmin.tamu.import', compact('eventId'));
+    }
+
     public function import(Request $request, $eventId)
     {
         Log::info('Import data tamu dipanggil untuk event ID: ' . $eventId);
@@ -162,7 +242,50 @@ class TamuController extends Controller
         return redirect()->route('admin.tamu.show', $eventId)->with('success', "Data tamu berhasil diimpor. Jumlah tamu yang ditambahkan: $newCount.");
     }
 
+    public function supimport(Request $request, $eventId)
+    {
+        Log::info('Import data tamu dipanggil untuk event ID: ' . $eventId);
+
+        $request->validate([
+            'file' => 'required|mimes:csv,txt',
+        ], [
+            'file.mimes' => 'Format file salah! Harus berupa file CSV.',
+        ]);
+
+        $path = $request->file('file')->getRealPath();
+        $data = array_map('str_getcsv', file($path));
+        array_shift($data);
+    
+        $newCount = 0; 
+    
+        foreach ($data as $row) {
+            if (count($row) >= 4) {
+                try {
+                    $this->supstoreTamu($row, $eventId);
+                    $newCount++; 
+                    Log::info('Data Tamu berhasil disimpan: ', $row);
+                } catch (\Exception $e) {
+                    Log::error('Gagal menyimpan data Tamu: ' . $e->getMessage());
+                }
+            } else {
+                Log::warning('Baris tidak valid: ' . implode(',', $row));
+            }
+        }
+        return redirect()->route('superadmin.tamu.show', $eventId)->with('success', "Data tamu berhasil diimpor. Jumlah tamu yang ditambahkan: $newCount.");
+    }
+
     private function storeTamu($row, $eventId)
+    {
+        return Tamu::create([
+            'idevent' => $eventId,
+            'nama' => $row[0],
+            'jenistamu' => $row[1],
+            'instansi' => $row[2],
+            'alamat' => $row[3],
+        ]);
+    }
+
+    private function supstoreTamu($row, $eventId)
     {
         return Tamu::create([
             'idevent' => $eventId,
@@ -184,4 +307,49 @@ class TamuController extends Controller
         return response()->json(['message' => 'Tamu ditemukan'], 200);
     }
 
+    public function supkehadiran($eventId)
+    {
+        $event = Event::findOrFail($eventId);
+        $tamus = Tamu::where('registrasi', 1)
+                    ->where('idevent', $eventId)
+                    ->get();
+
+        return view('superadmin.tamu.kehadiran', [
+            'tamus' => $tamus,
+            'event' => $event
+        ]);
+    }
+
+    public function kehadiran($eventId)
+    {
+        $event = Event::findOrFail($eventId);
+        $tamus = Tamu::where('registrasi', 1)
+                    ->where('idevent', $eventId)
+                    ->get();
+
+        return view('admin.tamu.kehadiran', [
+            'tamus' => $tamus,
+            'event' => $event
+        ]);
+    }
+
+    public function supunregister($tamuId)
+    {
+        $tamu = Tamu::findOrFail($tamuId);
+        $tamu->registrasi = 0;
+        $tamu->save();
+
+        return redirect()->back()->with('success', 'Registrasi tamu berhasil dihapus.');
+    }
+
+    public function unregister($tamuId)
+    {
+        $tamu = Tamu::findOrFail($tamuId);
+        $tamu->registrasi = 0;
+        $tamu->save();
+
+        return redirect()->back()->with('success', 'Registrasi tamu berhasil dihapus.');
+    }
+
+    
 }

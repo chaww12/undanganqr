@@ -16,9 +16,12 @@
         console.error('jsQR is not loaded');
     } else {
         let videoStream = null;
+        let hasScanned = false; // Menambahkan variabel untuk melacak status pemindaian
 
         document.getElementById('scanButton').addEventListener('click', function() {
-            startCameraAndScan();
+            if (!hasScanned) {
+                startCameraAndScan();
+            }
         });
 
         function startCameraAndScan() {
@@ -42,13 +45,17 @@
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d', { willReadFrequently: true });
 
+            // Fungsi pemindaian QR Code
             function scan() {
                 context.drawImage(video, 0, 0, canvas.width, canvas.height);
                 const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
                 const code = jsQR(imageData.data, canvas.width, canvas.height);
 
                 if (code) {
+                    if (hasScanned) return; // Cegah pemindaian kedua
+
                     console.log('QR Code detected:', code.data);
+                    hasScanned = true; // Set status telah dipindai
                     fetchGuestData(code.data); 
                 } else {
                     requestAnimationFrame(scan);
@@ -59,6 +66,15 @@
                 canvas.width = video.videoWidth || 640;
                 canvas.height = video.videoHeight || 480;
                 scan(); 
+            };
+
+            // Reset pemindaian saat video dimatikan
+            video.onended = function() {
+                hasScanned = false; // Reset status pemindaian
+                video.style.display = 'none'; // Sembunyikan video
+                if (videoStream) {
+                    videoStream.getTracks().forEach(track => track.stop());
+                }
             };
         }
 
@@ -118,6 +134,7 @@
 
             document.getElementById('closePopup').addEventListener('click', function() {
                 document.body.removeChild(popup);
+                hasScanned = false; // Reset status pemindaian
                 startCameraAndScan(); 
             });
         }
@@ -132,7 +149,12 @@
             closeButton.classList.add('mt-2', 'bg-red-500', 'text-white', 'px-2', 'py-1', 'rounded');
             closeButton.onclick = () => {
                 alertDiv.remove();
-                startCameraAndScan(); 
+                hasScanned = false; // Reset status pemindaian
+                // Matikan video jika ada
+                if (videoStream) {
+                    videoStream.getTracks().forEach(track => track.stop());
+                    document.getElementById('videoPreview').style.display = 'none'; // Sembunyikan video
+                }
             };
             alertDiv.appendChild(closeButton);
 
